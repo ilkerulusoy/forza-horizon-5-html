@@ -227,8 +227,14 @@
     .restart-btn:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(36,198,220,0.6); }
     .restart-btn:active { transform:translateY(0); }
   </style>
-  <!-- Three.js -->
-  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <!-- Three.js ES Module -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
 </head>
 <body>
   <div id="game"></div>
@@ -290,7 +296,9 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+  import * as THREE from 'three';
+  
   (() => {
     const container = document.getElementById('game');
     const hudScore = document.getElementById('score');
