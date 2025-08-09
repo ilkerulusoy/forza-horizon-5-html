@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <title>Open-Road Racer 3D (Three.js)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <style>
+    html, body { margin:0; padding:0; height:100%; background:#0b0e13; overflow:hidden; }
+    #game { position:fixed; inset:0; display:block; }
+    #hud {
+      position:fixed; left:0; top:0; right:0; pointer-events:none;
+      display:flex; flex-direction:column; gap:6px; padding:12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color:#ffffff; z-index:10;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    }
+    #score { font-size:16px; }
+    #status { font-size:13px; color:#c8d6e5; }
+    #flash { position:fixed; inset:0; background:#24c6dc; opacity:0; pointer-events:none; z-index:5; transition:opacity 220ms ease; mix-blend-mode:screen; }
+    #touch { position:fixed; inset:0; z-index:1; pointer-events:auto; }
+    
+    /* Mobile controls */
+    .control-btn {
+      position:fixed; 
+      width:70px; 
+      height:70px; 
+      border-radius:50%; 
+      border:3px solid rgba(255,255,255,0.5);
+      background:rgba(0,0,0,0.7); 
+      color:#fff; 
+      font-size:14px; 
+      font-weight:bold;
+      display:flex; 
+      align-items:center; 
+      justify-content:center; 
+      cursor:pointer;
+      transition:all 0.2s; 
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      z-index:1000;
+      user-select:none;
+      -webkit-user-select:none;
+      touch-action:manipulation;
+    }
+    .control-btn:active { 
+      transform:scale(0.9); 
+      background:rgba(255,255,255,0.3); 
+    }
+    .control-btn.active { 
+      background:rgba(36,198,220,0.7); 
+      border-color:#24c6dc;
+      box-shadow: 0 0 20px rgba(36,198,220,0.5);
+    }
+    #nitro-btn { 
+      left:20px; 
+      bottom:20px; 
+    }
+    #headlights-btn { 
+      right:20px; 
+      bottom:20px; 
+    }
+    #nitro-btn.ready { 
+      border-color:#24c6dc; 
+      animation: pulse 2s infinite;
+    }
+    #nitro-btn.cooling { 
+      opacity:0.5; 
+      border-color:#666;
+    }
+    
+    @keyframes pulse {
+      0% { box-shadow: 0 0 5px rgba(36,198,220,0.3); }
+      50% { box-shadow: 0 0 20px rgba(36,198,220,0.6); }
+      100% { box-shadow: 0 0 5px rgba(36,198,220,0.3); }
+    }
+    
+    /* Full Screen Radio */
+    #radio {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 60px;
+      z-index: 500;
+      font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 20px;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(0, 255, 0, 0.2);
+    }
+    
+    .radio-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      width: 100%;
+      max-width: 800px;
+    }
+    
+    .radio-station {
+      color: #00ff00;
+      font-size: 18px;
+      font-weight: bold;
+      text-shadow: 0 0 8px #00ff00;
+      min-width: 100px;
+    }
+    
+    .radio-song {
+      flex: 1;
+      color: #ffffff;
+      font-size: 14px;
+      text-align: center;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    
+    .radio-song-text {
+      display: inline-block;
+      animation: scroll-text 15s linear infinite;
+    }
+    
+    .radio-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .radio-btn {
+      width: 32px;
+      height: 32px;
+      background: rgba(0, 255, 0, 0.1);
+      border: 1px solid #00ff00;
+      border-radius: 4px;
+      color: #00ff00;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    
+    .radio-btn:hover {
+      background: rgba(0, 255, 0, 0.2);
+      box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+    }
+    
+    .radio-btn:active {
+      transform: scale(0.95);
+    }
+    
+    .radio-volume {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: #00ff00;
+      font-size: 12px;
+    }
+    
+    .volume-bars {
+      display: flex;
+      gap: 2px;
+    }
+    
+    .volume-bar {
+      width: 3px;
+      height: 12px;
+      background: rgba(0, 255, 0, 0.3);
+      border-radius: 1px;
+      transition: background 0.2s;
+    }
+    
+    .volume-bar.active {
+      background: #00ff00;
+      box-shadow: 0 0 4px #00ff00;
+    }
+    
+    .radio-status {
+      color: #888888;
+      font-size: 10px;
+      min-width: 40px;
+      text-align: center;
+    }
+    
+    @keyframes scroll-text {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+    
+    /* Game over popup */
+    #gameover-popup {
+      position:fixed; inset:0; background:rgba(0,0,0,0.8); 
+      display:none; align-items:center; justify-content:center; z-index:100;
+    }
+    #gameover-popup.show { display:flex; }
+    .popup-content {
+      background:linear-gradient(135deg, #1f2a35 0%, #0b0e13 100%);
+      padding:40px; border-radius:20px; text-align:center;
+      box-shadow:0 20px 60px rgba(0,0,0,0.8);
+      border:2px solid rgba(36,198,220,0.3);
+      max-width:90%; width:400px;
+    }
+    .popup-content h2 { 
+      color:#ff4d4f; margin:0 0 20px; font-size:32px; 
+      text-shadow:0 2px 4px rgba(0,0,0,0.5);
+    }
+    .popup-content p { 
+      color:#c8d6e5; margin:10px 0; font-size:18px;
+      font-family: ui-monospace, monospace;
+    }
+    .popup-content .distance { 
+      color:#24c6dc; font-size:36px; font-weight:bold; 
+      margin:20px 0; text-shadow:0 0 20px rgba(36,198,220,0.5);
+    }
+    .restart-btn {
+      margin-top:30px; padding:15px 40px; font-size:18px;
+      background:linear-gradient(135deg, #24c6dc, #1890ff);
+      color:#fff; border:none; border-radius:30px; cursor:pointer;
+      font-weight:bold; transition:all 0.3s;
+      box-shadow:0 4px 15px rgba(36,198,220,0.4);
+    }
+    .restart-btn:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(36,198,220,0.6); }
+    .restart-btn:active { transform:translateY(0); }
+  </style>
+  <!-- Three.js -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="flash"></div>
+  
+  <!-- Full Screen Radio -->
+  <div id="radio">
+    <div class="radio-container">
+      <div class="radio-station" id="radio-station">LIVE STREAM</div>
+      <div class="radio-song">
+        <div class="radio-song-text" id="radio-song">♪ Live Stream Radio - Now Playing ♪</div>
+      </div>
+      <div class="radio-controls">
+        <button class="radio-btn" id="radio-prev">◀</button>
+        <button class="radio-btn" id="radio-play">▶</button>
+        <button class="radio-btn" id="radio-next">▶</button>
+      </div>
+      <div class="radio-volume">
+        <span>VOL</span>
+        <div class="volume-bars" id="volume-bars">
+          <div class="volume-bar active"></div>
+          <div class="volume-bar active"></div>
+          <div class="volume-bar active"></div>
+          <div class="volume-bar active"></div>
+          <div class="volume-bar active"></div>
+          <div class="volume-bar"></div>
+          <div class="volume-bar"></div>
+          <div class="volume-bar"></div>
+        </div>
+        <span id="volume-level">62</span>
+      </div>
+      <div class="radio-status" id="radio-status">STOP</div>
+    </div>
+    <!-- Hidden audio element for streaming -->
+    <audio id="radio-audio" preload="none" crossorigin="anonymous">
+      <source src="http://46.20.3.204/" type="audio/mpeg">
+      Your browser does not support the audio element.
+    </audio>
+  </div>
+  
+  <div id="hud">
+    <div id="score">DIST 0 | Ready</div>
+    <div id="status">Ekrana dokun ve sürmeye başla!</div>
+  </div>
+  <div id="touch"></div>
+  
+  <!-- Mobile controls -->
+  <button id="nitro-btn" class="control-btn ready" type="button">NITRO</button>
+  <button id="headlights-btn" class="control-btn" type="button">FAR</button>
+  
+  <!-- Game over popup -->
+  <div id="gameover-popup">
+    <div class="popup-content">
+      <h2>OYUN BİTTİ!</h2>
+      <p>Çarpıştınız!</p>
+      <div class="distance">0</div>
+      <p>Mesafe</p>
+      <button class="restart-btn" onclick="location.reload()">Tekrar Oyna</button>
+    </div>
+  </div>
+
+  <script>
+  (() => {
+    const container = document.getElementById('game');
+    const hudScore = document.getElementById('score');
+    const flashEl = document.getElementById('flash');
+    const touchEl = document.getElementById('touch');
+    const headlightsBtn = document.getElementById('headlights-btn');
+    const nitroBtn = document.getElementById('nitro-btn');
+    const gameoverPopup = document.getElementById('gameover-popup');
+    const distanceDisplay = gameoverPopup.querySelector('.distance');
+    const radioStation = document.getElementById('radio-station');
+    const radioSong = document.getElementById('radio-song');
+    const radioPrevBtn = document.getElementById('radio-prev');
+    const radioNextBtn = document.getElementById('radio-next');
+    const radioPlayBtn = document.getElementById('radio-play');
+    const radioStatus = document.getElementById('radio-status');
+    const volumeBars = document.querySelectorAll('.volume-bar');
+    const volumeLevel = document.getElementById('volume-level');
+    const radioAudio = document.getElementById('radio-audio');
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b0e13);
+    scene.fog = new THREE.Fog(0x0b0e13, 18, 80);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(0, 3.2, 8);
+    camera.lookAt(0, 1.2, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    container.appendChild(renderer.domElement);
+
+    // Lights
+    const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+    scene.add(ambient);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.65);
+    dir.position.set(5, 10, 8);
+    scene.add(dir);
+
+    // Road texture using Canvas
+    function createRoadTexture() {
+      const w = 256, h = 1024;
+      const cvs = document.createElement('canvas');
+      cvs.width = w; cvs.height = h;
+      const ctx = cvs.getContext('2d');
+
+      // base asphalt
+      ctx.fillStyle = '#1f2a35';
+      ctx.fillRect(0, 0, w, h);
+
+      // roadside borders
+      ctx.fillStyle = '#0b0e13';
+      ctx.fillRect(0, 0, 8, h);
+      ctx.fillRect(w - 8, 0, 8, h);
+
+      // dashed lane separators (3 lanes -> 2 separators)
+      const laneXs = [Math.floor(w/3), Math.floor(2*w/3)];
+      ctx.fillStyle = '#f5f6fa';
+      const dashH = 60, gap = 70;
+      for (const x of laneXs) {
+        for (let y = -dashH; y < h + gap; y += dashH + gap) {
+          ctx.fillRect(x - 2, y, 4, dashH);
+        }
+      }
+
+      const tex = new THREE.CanvasTexture(cvs);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(1, 40);
+      tex.anisotropy = 8;
+      return tex;
+    }
+
+    const roadTex = createRoadTexture();
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: roadTex });
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 400), roadMat);
+    road.rotation.x = -Math.PI / 2; // make it horizontal (X-Z plane)
+    road.position.y = 0;
+    scene.add(road);
+
+    // Lane markers (visual cylinders at horizons)
+    function addGuardrails() {
+      const railMat = new THREE.MeshStandardMaterial({ color: 0x203040, metalness: 0.2, roughness: 0.9 });
+      const railGeo = new THREE.CylinderGeometry(0.05, 0.05, 400, 8);
+      const leftRail = new THREE.Mesh(railGeo, railMat);
+      leftRail.position.set(-3.6, 0.3, 0);
+      leftRail.rotation.z = Math.PI / 2;
+      const rightRail = leftRail.clone();
+      rightRail.position.x = 3.6;
+      scene.add(leftRail, rightRail);
+    }
+    addGuardrails();
+
+    // Player car
+    function createCar(color = 0x24c6dc, isPlayer = false) {
+      const group = new THREE.Group();
+      const bodyGeo = new THREE.BoxGeometry(0.9, 0.5, 1.6);
+      const bodyMat = new THREE.MeshStandardMaterial({ color, metalness: 0.2, roughness: 0.6 });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = 0.35;
+      group.add(body);
+
+      // windshield
+      const glass = new THREE.Mesh(
+        new THREE.BoxGeometry(0.6, 0.2, 0.5),
+        new THREE.MeshStandardMaterial({ color: 0x0b0e13, roughness: 1, metalness: 0 })
+      );
+      glass.position.set(0, 0.55, 0.2);
+      group.add(glass);
+
+      // tail lights (RED - at the BACK of car)
+      const tailMat = new THREE.MeshStandardMaterial({ color: 0xff4d4f, emissive: 0x6a0f10, emissiveIntensity: 0.3 });
+      const tailL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.1, 0.06), tailMat);
+      const tailR = tailL.clone();
+      tailL.position.set(-0.25, 0.28, -0.8);  // BACK of car (negative Z)
+      tailR.position.set(0.25, 0.28, -0.8);   // BACK of car (negative Z)
+      group.add(tailL, tailR);
+
+      // Add headlights for player car (front of car)
+      if (isPlayer) {
+        const headlightMat = new THREE.MeshStandardMaterial({ 
+          color: 0xffffcc, 
+          emissive: 0xffffcc, 
+          emissiveIntensity: 0 
+        });
+        const headlightL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.05), headlightMat);
+        const headlightR = headlightL.clone();
+        headlightL.position.set(-0.25, 0.28, 0.8);  // FRONT of car (positive Z)
+        headlightR.position.set(0.25, 0.28, 0.8);   // FRONT of car (positive Z)
+        group.add(headlightL, headlightR);
+        group.userData.headlights = [headlightL, headlightR];
+        
+        // Nitro fire effects at the back
+        const fireGroup = new THREE.Group();
+        
+        // Create smoke-like exhaust effect
+        const flames = [];
+        
+        // Main exhaust smoke plumes
+        const smokeGeo = new THREE.SphereGeometry(0.3, 6, 6);
+        for (let i = 0; i < 12; i++) {
+          const smokeMat = new THREE.MeshBasicMaterial({ 
+            color: 0xaaaaaa, 
+            transparent: true, 
+            opacity: 0,
+            blending: THREE.NormalBlending
+          });
+          const smoke = new THREE.Mesh(smokeGeo, smokeMat);
+          smoke.userData.isSmoke = true;
+          smoke.userData.life = 0;
+          smoke.userData.maxLife = 2 + Math.random() * 2;
+          smoke.userData.side = i % 2; // 0 = left, 1 = right
+          smoke.userData.delay = Math.random() * 1000;
+          flames.push(smoke);
+        }
+        
+        // Hot core flames (smaller, more intense)
+        const coreGeo = new THREE.ConeGeometry(0.08, 0.4, 6);
+        const coreMatL = new THREE.MeshBasicMaterial({ 
+          color: 0x4444ff, 
+          transparent: true, 
+          opacity: 0.8,
+          blending: THREE.AdditiveBlending
+        });
+        const coreMatR = coreMatL.clone();
+        const coreL = new THREE.Mesh(coreGeo, coreMatL);
+        const coreR = new THREE.Mesh(coreGeo, coreMatR);
+        coreL.position.set(-0.25, 0.28, -0.8);
+        coreR.position.set(0.25, 0.28, -0.8);
+        coreL.rotation.x = 0;
+        coreR.rotation.x = 0;
+        flames.push(coreL, coreR);
+        
+        // Add heat distortion spheres
+        for (let i = 0; i < 6; i++) {
+          const heatMat = new THREE.MeshBasicMaterial({ 
+            color: 0xff6600, 
+            transparent: true, 
+            opacity: 0,
+            blending: THREE.AdditiveBlending
+          });
+          const heat = new THREE.Mesh(new THREE.SphereGeometry(0.15, 4, 4), heatMat);
+          heat.userData.isHeat = true;
+          heat.userData.offset = Math.random() * Math.PI * 2;
+          flames.push(heat);
+        }
+        
+        flames.forEach(f => fireGroup.add(f));
+        fireGroup.visible = false;
+        group.add(fireGroup);
+        group.userData.nitroFire = fireGroup;
+        group.userData.nitroFlames = flames;
+      }
+
+      group.userData.type = isPlayer ? 'player' : 'traffic';
+      return group;
+    }
+
+    const player = createCar(0x24c6dc, true);
+    scene.add(player);
+    player.position.set(0, 0, 0);
+    player.rotation.y = Math.PI; // 180 derece çevir - doğru yöne baksın
+    
+    // Headlight spotlights - attached to player (adjusted for rotated car)
+    const headlightL = new THREE.SpotLight(0xffffcc, 0, 20, Math.PI / 4, 0.3, 1);
+    headlightL.position.set(0.25, 0.5, -0.8); // Swapped and adjusted for rotation
+    const headlightLTarget = new THREE.Object3D();
+    headlightLTarget.position.set(0.25, 0, 10); // Point forward (positive Z after rotation)
+    headlightL.target = headlightLTarget;
+    player.add(headlightL);
+    player.add(headlightLTarget);
+    
+    const headlightR = new THREE.SpotLight(0xffffcc, 0, 20, Math.PI / 4, 0.3, 1);
+    headlightR.position.set(-0.25, 0.5, -0.8); // Swapped and adjusted for rotation
+    const headlightRTarget = new THREE.Object3D();
+    headlightRTarget.position.set(-0.25, 0, 10); // Point forward (positive Z after rotation)
+    headlightR.target = headlightRTarget;
+    player.add(headlightR);
+    player.add(headlightRTarget);
+
+    // State
+    const lanes = [-2.0, 0.0, 2.0];
+    let currentLaneIndex = 1;
+    let targetX = lanes[currentLaneIndex];
+    let gameOver = false;
+    let distance = 0;
+    let worldSpeed = 16; // world scroll speed (units/s)
+    const maxSpeed = 32;
+    let dayNightT = 0; let dayNightDir = 1;
+    let headlightsOn = false;
+
+    const nitro = { ready: true, active: false, timer: 0, cooldown: 4500, duration: 1200 };
+    
+    // Radio state
+    const radioStations = [
+      { 
+        name: "LIVE STREAM", 
+        url: "http://46.20.3.204/",
+        songs: ["♪ Live Stream Radio - Now Playing ♪", "♪ Streaming Music 24/7 ♪", "♪ Your Favorite Hits ♪"]
+      },
+      { 
+        name: "SYNTHWAVE", 
+        songs: ["♪ Kavinsky - Nightcall ♪", "♪ The Midnight - Sunset ♪", "♪ Carpenter Brut - Turbo Killer ♪"]
+      },
+      { 
+        name: "ELECTRONIC", 
+        songs: ["♪ Daft Punk - One More Time ♪", "♪ Justice - D.A.N.C.E. ♪", "♪ Deadmau5 - Strobe ♪"]
+      },
+      { 
+        name: "HIP HOP", 
+        songs: ["♪ Dr. Dre - Still D.R.E. ♪", "♪ Eminem - Lose Yourself ♪", "♪ Kendrick Lamar - HUMBLE. ♪"]
+      },
+      { 
+        name: "RETRO 80s", 
+        songs: ["♪ A-ha - Take On Me ♪", "♪ Duran Duran - Hungry Like The Wolf ♪", "♪ Europe - The Final Countdown ♪"]
+      },
+      { 
+        name: "TALK RADIO", 
+        songs: ["Traffic Report: Heavy congestion on Highway 101...", "Weather: Sunny skies, perfect for racing...", "News: Local racing championship begins today..."]
+      }
+    ];
+    let currentStation = 0; // Start with LIVE STREAM
+    let currentSong = 0;
+    let isPlaying = false;
+    let volume = 62;
+
+    // Entities
+    const traffic = [];
+    const checkpoints = [];
+    const scenery = [];
+
+    function createTrafficCar() {
+      const car = createCar(0xffc857);
+      car.userData.type = 'traffic';
+      car.scale.set(1, 1, 1);
+      return car;
+    }
+
+    function createCheckpoint() {
+      const mat = new THREE.MeshStandardMaterial({ color: 0x2ed573, emissive: 0x092, emissiveIntensity: 0.3 });
+      const mesh = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 12, 24), mat);
+      mesh.rotation.x = Math.PI / 2;
+      mesh.position.y = 0.6;
+      mesh.userData.type = 'checkpoint';
+      return mesh;
+    }
+    
+    // Create tree
+    function createTree() {
+      const group = new THREE.Group();
+      
+      // Trunk
+      const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 1.5, 8);
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3c28 });
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.position.y = 0.75;
+      group.add(trunk);
+      
+      // Leaves
+      const leavesGeo = new THREE.ConeGeometry(1.2, 2.5, 8);
+      const leavesMat = new THREE.MeshStandardMaterial({ color: 0x228b22 });
+      const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+      leaves.position.y = 2.5;
+      group.add(leaves);
+      
+      group.userData.type = 'tree';
+      return group;
+    }
+    
+    // Create house
+    function createHouse() {
+      const group = new THREE.Group();
+      
+      // Base
+      const baseGeo = new THREE.BoxGeometry(2, 1.5, 1.8);
+      const baseMat = new THREE.MeshStandardMaterial({ color: 0x8b7355 });
+      const base = new THREE.Mesh(baseGeo, baseMat);
+      base.position.y = 0.75;
+      group.add(base);
+      
+      // Roof
+      const roofGeo = new THREE.ConeGeometry(1.5, 1, 4);
+      const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b0000 });
+      const roof = new THREE.Mesh(roofGeo, roofMat);
+      roof.position.y = 2;
+      roof.rotation.y = Math.PI / 4;
+      group.add(roof);
+      
+      // Windows
+      const windowMat = new THREE.MeshStandardMaterial({ 
+        color: 0x87ceeb, 
+        emissive: 0x87ceeb, 
+        emissiveIntensity: 0.2 
+      });
+      const windowGeo = new THREE.BoxGeometry(0.3, 0.3, 0.1);
+      const window1 = new THREE.Mesh(windowGeo, windowMat);
+      window1.position.set(-0.5, 0.75, 0.91);
+      const window2 = new THREE.Mesh(windowGeo, windowMat);
+      window2.position.set(0.5, 0.75, 0.91);
+      group.add(window1, window2);
+      
+      group.userData.type = 'house';
+      return group;
+    }
+    
+    // Create lamp post
+    function createLampPost() {
+      const group = new THREE.Group();
+      
+      // Post
+      const postGeo = new THREE.CylinderGeometry(0.05, 0.05, 3, 8);
+      const postMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8 });
+      const post = new THREE.Mesh(postGeo, postMat);
+      post.position.y = 1.5;
+      group.add(post);
+      
+      // Lamp
+      const lampGeo = new THREE.SphereGeometry(0.2, 8, 8);
+      const lampMat = new THREE.MeshStandardMaterial({ 
+        color: 0xffff99, 
+        emissive: 0xffff99, 
+        emissiveIntensity: 0.4 
+      });
+      const lamp = new THREE.Mesh(lampGeo, lampMat);
+      lamp.position.y = 3;
+      group.add(lamp);
+      
+      group.userData.type = 'lamppost';
+      return group;
+    }
+
+    function spawnTraffic() {
+      if (gameOver) return;
+      const lane = lanes[Math.floor(Math.random() * lanes.length)];
+      const car = createTrafficCar();
+      car.position.set(lane, 0, -60);
+      car.userData.speed = worldSpeed + 6 + Math.random() * 10;
+      scene.add(car);
+      traffic.push(car);
+    }
+
+    function spawnCheckpoint() {
+      if (gameOver) return;
+      const lane = lanes[Math.floor(Math.random() * lanes.length)];
+      const cp = createCheckpoint();
+      cp.position.set(lane, 0.6, -60);
+      cp.userData.speed = worldSpeed * 0.9;
+      scene.add(cp);
+      checkpoints.push(cp);
+    }
+    
+    function spawnScenery() {
+      if (gameOver) return;
+      
+      // Random scenery type
+      const types = ['tree', 'house', 'lamppost', 'tree', 'tree']; // More trees
+      const type = types[Math.floor(Math.random() * types.length)];
+      
+      let obj;
+      switch(type) {
+        case 'tree':
+          obj = createTree();
+          break;
+        case 'house':
+          obj = createHouse();
+          break;
+        case 'lamppost':
+          obj = createLampPost();
+          break;
+      }
+      
+      // Random side of road
+      const side = Math.random() > 0.5 ? -1 : 1;
+      const xPos = side * (4.5 + Math.random() * 3);
+      obj.position.set(xPos, 0, -60 - Math.random() * 20);
+      obj.userData.speed = worldSpeed * 0.95;
+      
+      // Random rotation for variety
+      obj.rotation.y = Math.random() * Math.PI * 2;
+      
+      scene.add(obj);
+      scenery.push(obj);
+    }
+
+    // UI flash helper
+    function flash(colorHex) {
+      flashEl.style.background = colorHex;
+      flashEl.style.opacity = '0.18';
+      requestAnimationFrame(() => {
+        flashEl.style.opacity = '0';
+      });
+    }
+
+    function setGameOver() {
+      if (gameOver) return;
+      gameOver = true;
+      flash('#ff4d4f');
+      
+      // Show game over popup
+      distanceDisplay.textContent = Math.floor(distance);
+      gameoverPopup.classList.add('show');
+    }
+
+    function resetGame() {
+      // remove all entities
+      for (const m of traffic) scene.remove(m);
+      for (const m of checkpoints) scene.remove(m);
+      for (const m of scenery) scene.remove(m);
+      traffic.length = 0; checkpoints.length = 0; scenery.length = 0;
+
+      // reset state
+      currentLaneIndex = 1; targetX = lanes[currentLaneIndex];
+      player.position.set(targetX, 0, 0);
+      worldSpeed = 16; distance = 0; gameOver = false;
+      nitro.ready = true; nitro.active = false; nitro.timer = 0;
+      
+      // Hide popup
+      gameoverPopup.classList.remove('show');
+      
+      // Reset nitro button
+      nitroBtn.classList.add('ready');
+      nitroBtn.classList.remove('cooling');
+      
+      // Radio stays on - don't reset radio state
+    }
+
+    // Input
+    const keys = { left: false, right: false };
+    function tryLaneChange(dir) {
+      const next = Math.max(0, Math.min(lanes.length - 1, currentLaneIndex + dir));
+      if (next !== currentLaneIndex) {
+        currentLaneIndex = next;
+        targetX = lanes[currentLaneIndex];
+      }
+    }
+    
+    function toggleHeadlights() {
+      headlightsOn = !headlightsOn;
+      const intensity = headlightsOn ? 2 : 0;
+      headlightL.intensity = intensity;
+      headlightR.intensity = intensity;
+      
+      // Update headlight emissive
+      if (player.userData.headlights) {
+        player.userData.headlights.forEach(light => {
+          light.material.emissiveIntensity = headlightsOn ? 0.8 : 0;
+        });
+      }
+      
+      headlightsBtn.classList.toggle('active', headlightsOn);
+    }
+    
+    function activateNitro() {
+      try {
+        if (nitro.ready && !nitro.active && !gameOver) {
+          nitro.active = true; 
+          nitro.ready = false; 
+          nitro.timer = 0; 
+          flash('#24c6dc');
+          
+          // Show fire effects safely
+          if (player && player.userData && player.userData.nitroFire) {
+            player.userData.nitroFire.visible = true;
+          }
+          
+          // Boost speed
+          worldSpeed = Math.min(worldSpeed * 1.5, maxSpeed * 1.2);
+          
+          // Update button
+          if (nitroBtn) {
+            nitroBtn.classList.remove('ready');
+            nitroBtn.classList.add('cooling');
+          }
+        }
+      } catch (e) {
+        console.error('Nitro activation error:', e);
+      }
+    }
+    
+    // Radio functions
+    function updateRadioDisplay() {
+      const station = radioStations[currentStation];
+      radioStation.textContent = station.name;
+      radioSong.textContent = station.songs[currentSong];
+      
+      // Update audio source if station has URL
+      if (station.url) {
+        radioAudio.src = station.url;
+      }
+      
+      // Animate station change
+      radioStation.style.transform = 'scale(0.8)';
+      setTimeout(() => {
+        radioStation.style.transform = 'scale(1)';
+      }, 150);
+    }
+    
+    function changeRadioStation(direction) {
+      // Stop current audio
+      radioAudio.pause();
+      isPlaying = false;
+      
+      currentStation += direction;
+      if (currentStation >= radioStations.length) currentStation = 0;
+      if (currentStation < 0) currentStation = radioStations.length - 1;
+      currentSong = 0;
+      updateRadioDisplay();
+      updatePlayPauseButton();
+    }
+    
+    function togglePlayPause() {
+      const station = radioStations[currentStation];
+      
+      if (station.url) {
+        // Live stream
+        if (isPlaying) {
+          radioAudio.pause();
+          isPlaying = false;
+        } else {
+          radioAudio.play().catch(e => {
+            console.log('Audio play failed:', e);
+            radioStatus.textContent = 'ERROR';
+          });
+          isPlaying = true;
+        }
+      } else {
+        // Simulated radio
+        isPlaying = !isPlaying;
+      }
+      
+      updatePlayPauseButton();
+    }
+    
+    function updatePlayPauseButton() {
+      radioPlayBtn.textContent = isPlaying ? '⏸' : '▶';
+      radioStatus.textContent = isPlaying ? 'PLAY' : 'STOP';
+    }
+    
+    function updateVolumeDisplay() {
+      volumeLevel.textContent = volume.toString().padStart(2, '0');
+      volumeBars.forEach((bar, i) => {
+        const shouldBeActive = i < Math.floor((volume / 100) * volumeBars.length);
+        bar.classList.toggle('active', shouldBeActive);
+      });
+      
+      // Update audio volume
+      radioAudio.volume = volume / 100;
+    }
+    
+    // Audio event listeners
+    radioAudio.addEventListener('loadstart', () => {
+      radioStatus.textContent = 'LOAD';
+    });
+    
+    radioAudio.addEventListener('canplay', () => {
+      if (isPlaying) radioStatus.textContent = 'PLAY';
+    });
+    
+    radioAudio.addEventListener('error', (e) => {
+      console.error('Radio stream error:', e);
+      radioStatus.textContent = 'ERROR';
+      isPlaying = false;
+      updatePlayPauseButton();
+    });
+    
+    radioAudio.addEventListener('ended', () => {
+      isPlaying = false;
+      updatePlayPauseButton();
+    });
+    
+    // Radio button events
+    radioPrevBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      changeRadioStation(-1);
+    });
+    
+    radioNextBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      changeRadioStation(1);
+    });
+    
+    radioPlayBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      togglePlayPause();
+    });
+    
+    // Volume controls (click on volume bars)
+    volumeBars.forEach((bar, i) => {
+      bar.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        volume = Math.floor(((i + 1) / volumeBars.length) * 100);
+        updateVolumeDisplay();
+      });
+    });
+    
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') { tryLaneChange(-1); }
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') { tryLaneChange(1); }
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { activateNitro(); }
+      if (e.code === 'KeyR') { resetGame(); }
+      if (e.code === 'KeyF') { toggleHeadlights(); }
+    });
+
+    // Touch controls for lane change - mobilde sola tıkla sola, sağa tıkla sağa git
+    touchEl.addEventListener('pointerdown', (e) => {
+      // Don't process if clicking on buttons
+      if (e.target.id === 'headlights-btn' || e.target.id === 'nitro-btn') return;
+      
+      const x = e.clientX;
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+      
+      // Avoid button areas (bottom 120px)
+      if (e.clientY > screenHeight - 120) return;
+      
+      // Ekranın üçte birlik bölümlerine göre hareket
+      if (x < screenWidth * 0.33) {
+        // Sol bölge - en sol şeride git
+        if (currentLaneIndex > 0) tryLaneChange(-1);
+      } else if (x > screenWidth * 0.67) {
+        // Sağ bölge - en sağ şeride git
+        if (currentLaneIndex < lanes.length - 1) tryLaneChange(1);
+      } else {
+        // Orta bölge - ortaya dön
+        const targetLane = 1;
+        const diff = targetLane - currentLaneIndex;
+        if (diff !== 0) {
+          currentLaneIndex = targetLane;
+          targetX = lanes[currentLaneIndex];
+        }
+      }
+    });
+    
+    // Mobile button controls - both click and touch
+    headlightsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleHeadlights();
+    });
+    
+    headlightsBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleHeadlights();
+    });
+    
+    nitroBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      activateNitro();
+    });
+    
+    nitroBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      activateNitro();
+    });
+
+    // Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Timers
+    let trafficTimer = 0;
+    let checkpointTimer = 0;
+    let difficultyTimer = 0;
+    let sceneryTimer = 0;
+
+    // Collisions
+    const playerBB = new THREE.Box3();
+    const tempBB = new THREE.Box3();
+
+    // Main loop
+    const clock = new THREE.Clock();
+    function animate() {
+      const delta = Math.min(clock.getDelta(), 0.05); // clamp for safety
+
+      // Update nitro
+      if (nitro.active) {
+        nitro.timer += delta * 1000;
+        
+        // Animate smoke-like exhaust effects (simplified)
+        if (player.userData.nitroFlames) {
+          const time = Date.now() * 0.001;
+          let smokeIndex = 0;
+          
+          player.userData.nitroFlames.forEach((flame, i) => {
+            try {
+              if (flame.userData.isSmoke) {
+                // Simple smoke animation
+                const baseX = (smokeIndex % 2 === 0) ? -0.25 : 0.25;
+                const animTime = time + i * 0.5;
+                
+                flame.position.x = baseX + Math.sin(animTime * 2) * 0.2;
+                flame.position.y = 0.28 + Math.sin(animTime) * 0.3;
+                flame.position.z = -0.8 - Math.sin(animTime * 0.5) * 1.0;
+                
+                flame.scale.setScalar(0.5 + Math.sin(animTime * 3) * 0.3);
+                flame.material.opacity = 0.3 + Math.sin(animTime * 4) * 0.2;
+                flame.material.color.setHex(0x888888);
+                
+                smokeIndex++;
+              } else if (flame.userData.isHeat) {
+                // Simple heat effect
+                const heatTime = time * 3 + i;
+                flame.material.opacity = 0.2 + Math.sin(heatTime) * 0.1;
+                flame.scale.setScalar(0.8 + Math.sin(heatTime * 2) * 0.2);
+              } else {
+                // Core flame (simple flicker)
+                flame.material.opacity = 0.7 + Math.random() * 0.3;
+                flame.scale.setScalar(0.8 + Math.random() * 0.2);
+              }
+            } catch (e) {
+              console.error('Nitro animation error:', e);
+            }
+          });
+        }
+        
+        if (nitro.timer >= nitro.duration) {
+          nitro.active = false; 
+          nitro.timer = 0;
+          worldSpeed = Math.max(worldSpeed * 0.72, 12);
+          
+          // Hide fire effects
+          if (player.userData.nitroFire) {
+            player.userData.nitroFire.visible = false;
+          }
+        }
+      } else if (!nitro.ready) {
+        nitro.timer += delta * 1000;
+        if (nitro.timer >= nitro.cooldown) {
+          nitro.ready = true; 
+          nitro.timer = 0; 
+          flash('#24c6dc');
+          
+          // Update button
+          nitroBtn.classList.add('ready');
+          nitroBtn.classList.remove('cooling');
+        }
+      }
+
+      // Difficulty ramp
+      if (!gameOver) {
+        difficultyTimer += delta;
+        if (difficultyTimer >= 1.2) {
+          worldSpeed = Math.min(maxSpeed, worldSpeed + 0.5);
+          difficultyTimer = 0;
+        }
+      }
+
+      // Camera slight FOV/position pulse on nitro
+      const nitroFactor = nitro.active ? 1.06 : 1.0;
+      camera.position.z = 8 / nitroFactor;
+      camera.fov = 60 * (nitro.active ? 1.05 : 1.0);
+      camera.updateProjectionMatrix();
+
+      // Day/Night ambient oscillation
+      dayNightT += delta * dayNightDir * 0.12;
+      if (dayNightT > 1 || dayNightT < 0) dayNightDir *= -1;
+      const ambIntensity = 0.45 + 0.2 * dayNightT;
+      ambient.intensity = ambIntensity;
+
+      // Road texture scroll
+      const baseSpeed = worldSpeed * (nitro.active ? 1.45 : 1.0);
+      road.material.map.offset.y -= (baseSpeed * delta) * 0.12;
+
+      // Move player towards target lane (lerp)
+      player.position.x += (targetX - player.position.x) * Math.min(1, delta * 12);
+
+      // Spawn logic
+      if (!gameOver) {
+        trafficTimer += delta * 1000;
+        checkpointTimer += delta * 1000;
+        sceneryTimer += delta * 1000;
+        if (trafficTimer >= 700) { spawnTraffic(); trafficTimer = 0; }
+        if (checkpointTimer >= 2000) { spawnCheckpoint(); checkpointTimer = 0; }
+        if (sceneryTimer >= 400) { spawnScenery(); sceneryTimer = 0; }
+      }
+
+      // Update entities
+      const removalTraffic = [];
+      for (let i = 0; i < traffic.length; i++) {
+        const c = traffic[i];
+        const targetSpeed = Math.max(c.userData.speed, worldSpeed * 0.85);
+        if (!gameOver) c.position.z += targetSpeed * delta;
+        if (c.position.z > 12) { removalTraffic.push(i); scene.remove(c); }
+      }
+      // remove in reverse order
+      for (let i = removalTraffic.length - 1; i >= 0; i--) traffic.splice(removalTraffic[i], 1);
+
+      const removalCP = [];
+      for (let i = 0; i < checkpoints.length; i++) {
+        const cp = checkpoints[i];
+        if (!gameOver) cp.position.z += cp.userData.speed * delta;
+        cp.rotation.z += delta * 1.8;
+        if (cp.position.z > 12) { removalCP.push(i); scene.remove(cp); }
+      }
+      for (let i = removalCP.length - 1; i >= 0; i--) checkpoints.splice(removalCP[i], 1);
+      
+      // Update scenery
+      const removalScenery = [];
+      for (let i = 0; i < scenery.length; i++) {
+        const obj = scenery[i];
+        if (!gameOver) obj.position.z += obj.userData.speed * delta;
+        if (obj.position.z > 15) { removalScenery.push(i); scene.remove(obj); }
+      }
+      for (let i = removalScenery.length - 1; i >= 0; i--) scenery.splice(removalScenery[i], 1);
+
+      // Collisions
+      if (!gameOver) {
+        playerBB.setFromObject(player);
+        for (const c of traffic) {
+          tempBB.setFromObject(c);
+          if (playerBB.intersectsBox(tempBB)) { setGameOver(); break; }
+        }
+        if (!gameOver) {
+          for (let i = checkpoints.length - 1; i >= 0; i--) {
+            const cp = checkpoints[i];
+            tempBB.setFromObject(cp);
+            if (playerBB.intersectsBox(tempBB)) {
+              scene.remove(cp);
+              checkpoints.splice(i, 1);
+              distance += 150; // bonus
+              flash('#2ed573');
+            }
+          }
+        }
+      }
+
+      // Distance / UI
+      if (!gameOver) distance += baseSpeed * delta * 1.1;
+      const shown = Math.floor(distance * (nitro.active ? 1.2 : 1.0));
+      const nitroTxt = nitro.active ? 'NITRO!' : (nitro.ready ? 'Ready' : 'Cooling');
+      hudScore.textContent = `DIST ${shown} | ${nitroTxt}`;
+      
+      // Auto change songs every 20 seconds (if playing)
+      if (isPlaying && Date.now() % 20000 < 100) {
+        const station = radioStations[currentStation];
+        currentSong = (currentSong + 1) % station.songs.length;
+        radioSong.textContent = station.songs[currentSong];
+      }
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    // Start
+    resetGame();
+    updateRadioDisplay();
+    updateVolumeDisplay();
+    
+    // Auto start radio with live stream
+    setTimeout(() => {
+      isPlaying = true;
+      radioAudio.play().catch(e => {
+        console.log('Auto-start failed:', e);
+      });
+      updatePlayPauseButton();
+    }, 1000);
+    
+    animate();
+  })();
+  </script>
+</body>
+</html>
+
+
